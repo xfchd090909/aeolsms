@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Outlook 文件发信系统</title>
+</head>
+<body>
+<h1>Outlook 文件发信系统</h1>
+
+<form id="fileForm">
+  <label>邮件标题: <input type="text" id="subject" required></label><br><br>
+  <label>文件: <input type="file" id="fileInput" required></label><br><br>
+  <label>文件密码（可选）: <input type="text" id="filePassword"></label><br><br>
+  <button type="submit">上传并发送</button>
+</form>
+
+<div id="result"></div>
+
+<script>
+const form = document.getElementById('fileForm');
+const resultDiv = document.getElementById('result');
+
+form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const subject = document.getElementById('subject').value;
+    const file = document.getElementById('fileInput').files[0];
+    const password = document.getElementById('filePassword').value;
+
+    if (!file) {
+        alert('请选择文件');
+        return;
+    }
+
+    resultDiv.innerText = '上传文件中...';
+
+    const formData = new FormData();
+    formData.append('file', file);
+    if (password) formData.append('password', password);
+
+    // 调用 file.pizza 上传
+    const fpResponse = await fetch('https://file.pizza/upload', {
+        method: 'POST',
+        body: formData
+    });
+    
+    const fpData = await fpResponse.json();
+
+    const longUrl = fpData.url;      // 长链接
+    const shortUrl = fpData.shortUrl; // 短链接
+
+    // 调用 Netlify 后端函数发送邮件
+    const emailResponse = await fetch('/.netlify/functions/sendEmail', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            subject,
+            fileName: file.name,
+            fileSize: file.size,
+            longUrl,
+            shortUrl,
+            password
+        })
+    });
+
+    const emailResult = await emailResponse.json();
+    if (emailResult.success) {
+        resultDiv.innerHTML = `邮件发送成功! <br>文件长链接: ${longUrl} <br>短链接: ${shortUrl}`;
+    } else {
+        resultDiv.innerText = `邮件发送失败: ${emailResult.error}`;
+    }
+});
+</script>
+</body>
+</html>
